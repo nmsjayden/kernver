@@ -20,7 +20,7 @@ echo "TPM kernver Control Script"
 echo "=========================="
 echo "1) Block kernver updates (install stub)"
 echo "2) Restore original tpm_managerd (undo)"
-read -p "Choose an option (1 or 2): " CHOICE
+read -p "Choose an option (1 or 2): " CHOICE < /dev/tty
 
 set -e
 set -o pipefail
