@@ -1,6 +1,12 @@
 #!/bin/bash
-# Interactive TPM kernver controller for ChromeOS
+# kernverctl - Interactive TPM kernver controller for ChromeOS
 # Blocks or restores kernver bump
+# Pipeable: curl ... | bash
+
+# Re-exec as root if not running as root
+if [ "$EUID" -ne 0 ]; then
+  exec sudo bash "$0" "$@"
+fi
 
 STUB_DIR="/usr/local/tpm_stub"
 STUB_FILE="$STUB_DIR/tpm_managerd"
@@ -17,31 +23,28 @@ echo "2) Restore original tpm_managerd (undo)"
 read -p "Choose an option (1 or 2): " CHOICE
 
 set -e
+set -o pipefail
+set -u
 
 case "$CHOICE" in
   1)
     echo "[*] Installing TPM stub to block kernver updates..."
+    mount -o remount,rw /
 
-    sudo mount -o remount,rw /
-
-    # Backup original if not already backed up
     if [ -f "$BACKUP" ]; then
       echo "[!] Backup already exists at $BACKUP. Not overwriting."
       echo "[*] Skipping backup creation."
     else
       echo "[*] Backing up original tpm_managerd to $BACKUP"
-      sudo cp "$TARGET" "$BACKUP"
+      cp "$TARGET" "$BACKUP"
     fi
 
-    # Create stub
-    echo -e '#!/bin/sh\nexit 0' | sudo tee "$STUB_FILE" >/dev/null
-    sudo chmod +x "$STUB_FILE"
+    echo -e '#!/bin/sh\nexit 0' > "$STUB_FILE"
+    chmod +x "$STUB_FILE"
 
-    # Replace system binary
-    sudo cp "$STUB_FILE" "$TARGET"
+    cp "$STUB_FILE" "$TARGET"
 
-    # Add boot-time patcher
-    cat <<EOF | sudo tee "$INIT_SCRIPT" >/dev/null
+    cat <<EOF > "$INIT_SCRIPT"
 description "TPM managerd stub auto-replacer"
 
 start on started system-services
@@ -57,11 +60,10 @@ EOF
 
   2)
     echo "[*] Restoring original tpm_managerd..."
-
     if [ -f "$BACKUP" ]; then
-      sudo mount -o remount,rw /
-      sudo cp "$BACKUP" "$TARGET"
-      sudo rm -f "$INIT_SCRIPT"
+      mount -o remount,rw /
+      cp "$BACKUP" "$TARGET"
+      rm -f "$INIT_SCRIPT"
       echo "[+] Original tpm_managerd restored. Stub removed."
     else
       echo "[!] No backup found at $BACKUP. Cannot restore."
