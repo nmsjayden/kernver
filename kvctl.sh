@@ -1,11 +1,11 @@
 #!/bin/bash
-# kernverctl - Interactive TPM kernver controller for ChromeOS
-# Blocks or restores kernver bump
-# Pipeable: curl ... | bash
+# kernverctl - Pipeable TPM kernver controller for ChromeOS
+# Works in VT2 interactively
 
-# Re-exec as root if not running as root
+# Make sure running as root
 if [ "$EUID" -ne 0 ]; then
-  exec sudo bash "$0" "$@"
+  echo "[*] Re-executing as root..."
+  exec sudo bash "$0"
 fi
 
 STUB_DIR="/usr/local/tpm_stub"
@@ -16,26 +16,27 @@ INIT_SCRIPT="/etc/init/stub-tpm.conf"
 
 mkdir -p "$STUB_DIR"
 
-echo "TPM kernver Control Script"
-echo "=========================="
-echo "1) Block kernver updates (install stub)"
-echo "2) Restore original tpm_managerd (undo)"
-read -p "Choose an option (1 or 2): " CHOICE < /dev/tty
+# Force interactive input/output via /dev/tty
+tty_in="/dev/tty"
+tty_out="/dev/tty"
 
-set -e
-set -o pipefail
-set -u
+echo "TPM kernver Control Script" > "$tty_out"
+echo "==========================" > "$tty_out"
+echo "1) Block kernver updates (install stub)" > "$tty_out"
+echo "2) Restore original tpm_managerd (undo)" > "$tty_out"
+read -p "Choose an option (1 or 2): " CHOICE < "$tty_in"
+
+set -euo pipefail
 
 case "$CHOICE" in
   1)
-    echo "[*] Installing TPM stub to block kernver updates..."
+    echo "[*] Installing TPM stub..." > "$tty_out"
     mount -o remount,rw /
 
     if [ -f "$BACKUP" ]; then
-      echo "[!] Backup already exists at $BACKUP. Not overwriting."
-      echo "[*] Skipping backup creation."
+      echo "[!] Backup exists. Skipping..." > "$tty_out"
     else
-      echo "[*] Backing up original tpm_managerd to $BACKUP"
+      echo "[*] Backing up original tpm_managerd..." > "$tty_out"
       cp "$TARGET" "$BACKUP"
     fi
 
@@ -55,23 +56,23 @@ script
 end script
 EOF
 
-    echo "[+] Stub installed. Kernver updates are now blocked."
+    echo "[+] Stub installed." > "$tty_out"
     ;;
 
   2)
-    echo "[*] Restoring original tpm_managerd..."
+    echo "[*] Restoring original tpm_managerd..." > "$tty_out"
     if [ -f "$BACKUP" ]; then
       mount -o remount,rw /
       cp "$BACKUP" "$TARGET"
       rm -f "$INIT_SCRIPT"
-      echo "[+] Original tpm_managerd restored. Stub removed."
+      echo "[+] Original restored." > "$tty_out"
     else
-      echo "[!] No backup found at $BACKUP. Cannot restore."
+      echo "[!] No backup found." > "$tty_out"
     fi
     ;;
 
   *)
-    echo "[!] Invalid option. Exiting."
+    echo "[!] Invalid option. Exiting." > "$tty_out"
     exit 1
     ;;
 esac
