@@ -1,8 +1,7 @@
 #!/bin/bash
 # kernverctl - Pipeable TPM kernver controller for ChromeOS
-# Works in VT2 interactively
+# VT2 interactive version (no remount calls)
 
-# Make sure running as root
 if [ "$EUID" -ne 0 ]; then
   echo "[*] Re-executing as root..."
   exec sudo bash "$0"
@@ -16,7 +15,6 @@ INIT_SCRIPT="/etc/init/stub-tpm.conf"
 
 mkdir -p "$STUB_DIR"
 
-# Force interactive input/output via /dev/tty
 tty_in="/dev/tty"
 tty_out="/dev/tty"
 
@@ -31,7 +29,6 @@ set -euo pipefail
 case "$CHOICE" in
   1)
     echo "[*] Installing TPM stub..." > "$tty_out"
-    mount -o remount,rw /
 
     if [ -f "$BACKUP" ]; then
       echo "[!] Backup exists. Skipping..." > "$tty_out"
@@ -42,7 +39,6 @@ case "$CHOICE" in
 
     echo -e '#!/bin/sh\nexit 0' > "$STUB_FILE"
     chmod +x "$STUB_FILE"
-
     cp "$STUB_FILE" "$TARGET"
 
     cat <<EOF > "$INIT_SCRIPT"
@@ -62,7 +58,6 @@ EOF
   2)
     echo "[*] Restoring original tpm_managerd..." > "$tty_out"
     if [ -f "$BACKUP" ]; then
-      mount -o remount,rw /
       cp "$BACKUP" "$TARGET"
       rm -f "$INIT_SCRIPT"
       echo "[+] Original restored." > "$tty_out"
